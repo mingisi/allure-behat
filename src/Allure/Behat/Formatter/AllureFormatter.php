@@ -1,21 +1,4 @@
 <?php
-/**
- * Copyright (c) Eduard Sukharev
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * See LICENSE.md for full license text.
- */
 
 namespace Allure\Behat\Formatter;
 
@@ -24,15 +7,14 @@ namespace Allure\Behat\Formatter;
 // use Behat\Behat\Event\StepEvent;
 // use Behat\Behat\Event\SuiteEvent;
 // use Behat\Behat\Formatter\FormatterInterface;
-// use Behat\Gherkin\Node\FeatureNode;
-// use Behat\Gherkin\Node\OutlineNode;
-// use Behat\Gherkin\Node\ScenarioNode;
 
 
 // use Behat\Behat\EventDispatcher\Event\OutlineExampleEvent;
 // use Behat\Behat\EventDispatcher\Event\ScenarioEvent;
 // use Behat\Behat\EventDispatcher\Event\StepEvent;
 // use Behat\Behat\EventDispatcher\Event\SuiteEvent;
+use Behat\Behat\Tester\Result\StepResult;
+
 use Behat\Testwork\Output\Formatter;
 use Behat\Testwork\EventDispatcher\Event\AfterExerciseCompleted;
 use Behat\Testwork\EventDispatcher\Event\AfterSuiteTested;
@@ -42,15 +24,16 @@ use Behat\Behat\EventDispatcher\Event\AfterFeatureTested;
 use Behat\Behat\EventDispatcher\Event\AfterOutlineTested;
 use Behat\Behat\EventDispatcher\Event\AfterScenarioTested;
 use Behat\Behat\EventDispatcher\Event\AfterStepTested;
+use Behat\Behat\EventDispatcher\Event\BeforeStepTested;
 use Behat\Behat\EventDispatcher\Event\BeforeFeatureTested;
 use Behat\Behat\EventDispatcher\Event\BeforeOutlineTested;
 use Behat\Behat\EventDispatcher\Event\BeforeScenarioTested;
 use Behat\Testwork\Tester\Result;
 use Behat\Testwork\Output\Printer\OutputPrinter as PrinterInterface;
 
-// use Behat\Gherkin\Node\FeatureNode;
-// use Behat\Gherkin\Node\OutlineNode;
-// use Behat\Gherkin\Node\ScenarioNode;
+use Behat\Gherkin\Node\FeatureNode;
+use Behat\Gherkin\Node\OutlineNode;
+use Behat\Gherkin\Node\ScenarioNode;
 
 use DateTime;
 use Exception;
@@ -94,11 +77,33 @@ class AllureFormatter implements Formatter
 {
     private $translator;
 
-    private $parameters;
-
     private $uuid;
+    private $filename = 'allure-results';
 
-     /**
+    /**
+     * behat.yml parameters
+     *
+     * @var Array
+     */
+    private $parameters = [];
+
+    /**
+     * location to save the generated report file
+     *
+     * @var String
+     */
+    private $outputPath;
+
+    /**
+     * reports base bath
+     *
+     * @var string
+     */
+    private $base_path;
+
+    /**
+     * name of the formatter
+     *
      * @var String
      */
     private $name;
@@ -117,27 +122,20 @@ class AllureFormatter implements Formatter
     public function __construct($name, $output, $delete_previous_results, $ignored_tags, $severity_tag_prefix, $issue_tag_prefix, $test_id_tag_prefix, $base_path)
     {
 
-        // $filename = 'abc';
-        // $base_path = './';
+        $defaultLanguage = null;
+        if (($locale = getenv('LANG')) && preg_match('/^([a-z]{2})/', $locale, $matches)) {
+            $defaultLanguage = $matches[1];
+        }
 
-        // $defaultLanguage = null;
-        // if (($locale = getenv('LANG')) && preg_match('/^([a-z]{2})/', $locale, $matches)) {
-        //     $defaultLanguage = $matches[1];
-        // }
+        $this->name = $name;
+        $this->parameters['output'] = $output;        // $this->parameters['language'] = $language;
+        $this->parameters['language'] = $defaultLanguage;
+        $this->parameters['ignored_tags'] = $ignored_tags;
+        $this->parameters['issue_tag_prefix'] = $issue_tag_prefix;
+        $this->parameters['severity_tag_prefix'] = $severity_tag_prefix;
+        $this->parameters['delete_previous_results'] = $delete_previous_results;
 
-        // $this->parameters = new ParameterBag(array(
-        //     'language' => $defaultLanguage,
-        //     'output' => 'build' . DIRECTORY_SEPARATOR . 'allure-results',
-        //     'ignored_tags' => array(),
-        //     'severity_tag_prefix' => 'severity_',
-        //     'issue_tag_prefix' => 'bug_',
-        //     'test_id_tag_prefix' => 'test_',
-        //     'delete_previous_results' => true,
-        // ));
-
-        // $this->printer = new FileOutputPrinter([], $filename, $base_path);
-
-        echo "\n\n$name, $output, $delete_previous_results, $ignored_tags, $severity_tag_prefix, $issue_tag_prefix, $test_id_tag_prefix, $base_path\n\n";
+        $this->printer = new FileOutputPrinter([], $this->filename, $base_path);
     }
 
     /**
@@ -150,9 +148,6 @@ class AllureFormatter implements Formatter
         $this->translator = $translator;
     }
 
-
-
-
     /**
      * Checks if current formatter has parameter.
      *
@@ -164,7 +159,6 @@ class AllureFormatter implements Formatter
     {
         return $this->parameters->has($name);
     }
-
 
     /**
      * Returns formatter name.
@@ -213,7 +207,7 @@ class AllureFormatter implements Formatter
      */
     public function getParameter($name)
     {
-        return $this->parameters->get($name);
+        return $this->parameters[$name];
     }
 
     /**
@@ -221,25 +215,9 @@ class AllureFormatter implements Formatter
      */
     public static function getSubscribedEvents()
     {
-        // $events = array(
-        //     'beforeSuite', tester.suite_tested.before -> onBeforeSuiteTested
-        //     'afterSuite', tester.suite_tested.after -> onAfterSuiteTested
-        //     'beforeScenario', tester.scenario_tested.before -> onBeforeScenarioTested
-        //     'afterScenario', tester.scenario_tested.after ->onAfterScenarioTested
-        //     'beforeOutlineExample', tester.outline_tested.before -> onBeforeOutlineTested
-        //     'afterOutlineExample', tester.outline_tested.after -> onAfterOutlineTested
-        //     'beforeStep', tester.step_tested.before -> onBeforeStepTested
-        //     'afterStep', tester.step_tested.after -> onAfterStepTested
-        // );
-
-        // return array_combine($events, $events);
          return array(
-            'tester.exercise_completed.before' => 'onBeforeExercise',
-            'tester.exercise_completed.after'  => 'onAfterExercise',
             'tester.suite_tested.before'       => 'onBeforeSuiteTested',
             'tester.suite_tested.after'        => 'onAfterSuiteTested',
-            'tester.feature_tested.before'     => 'onBeforeFeatureTested',
-            'tester.feature_tested.after'      => 'onAfterFeatureTested',
             'tester.scenario_tested.before'    => 'onBeforeScenarioTested',
             'tester.scenario_tested.after'     => 'onAfterScenarioTested',
             'tester.outline_tested.before'     => 'onBeforeOutlineTested',
@@ -257,8 +235,8 @@ class AllureFormatter implements Formatter
         AnnotationProvider::addIgnoredAnnotations(array());
 
         $this->prepareOutputDirectory(
-            $this->parameters->get('output'),
-            $this->parameters->get('delete_previous_results')
+            $this->getParameter('output'),
+            $this->getParameter('delete_previous_results')
         );
         $now = new DateTime();
         $event = new TestSuiteStartedEvent(sprintf('TestSuite-%s', $now->format('Y-m-d_His')));
@@ -282,13 +260,15 @@ class AllureFormatter implements Formatter
     public function onBeforeScenarioTested(BeforeScenarioTested $scenarioEvent)
     {
         $scenario = $scenarioEvent->getScenario();
+
         $annotations = array_merge(
-            $this->parseFeatureAnnotations($scenarioEvent->getScenario()->getFeature()),
+            $this->parseFeatureAnnotations($scenarioEvent->getFeature()),
             $this->parseScenarioAnnotations($scenario)
         );
+
         $annotationManager = new AnnotationManager($annotations);
 
-        $scenarioName = sprintf('%s:%d', $scenario->getFile(), $scenario->getLine());
+        $scenarioName = sprintf('%s:%d', $scenarioEvent->getFeature()->getFile(), $scenario->getLine());
         $event = new TestCaseStartedEvent($this->uuid, $scenarioName);
         $annotationManager->updateTestCaseEvent($event);
 
@@ -326,7 +306,7 @@ class AllureFormatter implements Formatter
      */
     public function onAfterScenarioTested(AfterScenarioTested $scenarioEvent)
     {
-        $this->processScenarioResult($scenarioEvent->getResult());
+        $this->processScenarioResult($scenarioEvent->getTestResult());
     }
 
     /**
@@ -334,7 +314,7 @@ class AllureFormatter implements Formatter
      */
     public function onAfterOutlineTested(AfterOutlineTested $outlineExampleEvent)
     {
-        $this->processScenarioResult($outlineExampleEvent->getResult());
+        $this->processScenarioResult($outlineExampleEvent->getTestResult());
     }
 
     /**
@@ -354,20 +334,21 @@ class AllureFormatter implements Formatter
      */
     public function onAfterStepTested(AfterStepTested $stepEvent)
     {
-        switch ($stepEvent->getResult()) {
-            case StepEvent::FAILED:
+ 
+        switch ($stepEvent->getTestResult()->getResultCode()) {
+            case StepResult::FAILED:
                 $this->exception = $stepEvent->getException();
                 $this->addFailedStep();
                 break;
-            case StepEvent::UNDEFINED:
+            case StepResult::UNDEFINED:
                 $this->exception = $stepEvent->getException();
                 $this->addFailedStep();
                 break;
-            case StepEvent::PENDING:
-            case StepEvent::SKIPPED:
+            case StepResult::PENDING:
+            case StepResult::SKIPPED:
                 $this->addCanceledStep();
                 break;
-            case StepEvent::PASSED:
+            case StepResult::PASSED:
             default:
                 $this->exception = null;
         }
@@ -403,20 +384,20 @@ class AllureFormatter implements Formatter
      */
     protected function processScenarioResult($result)
     {
-        switch ($result) {
-            case StepEvent::FAILED:
+        switch ($result->getResultCode()) {
+            case StepResult::FAILED:
                 $this->addTestCaseFailed();
                 break;
-            case StepEvent::UNDEFINED:
+            case StepResult::UNDEFINED:
                 $this->addTestCaseBroken();
                 break;
-            case StepEvent::PENDING:
+            case StepResult::PENDING:
                 $this->addTestCasePending();
                 break;
-            case StepEvent::SKIPPED:
+            case StepResult::SKIPPED:
                 $this->addTestCaseCancelled();
                 break;
-            case StepEvent::PASSED:
+            case StepResult::PASSED:
             default:
                 $this->exception = null;
         }

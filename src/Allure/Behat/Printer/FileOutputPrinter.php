@@ -33,8 +33,6 @@ class FileOutputPrinter implements PrinterInterface {
    * @param $base_path
    */
   public function __construct($rendererList, $filename, $base_path) {
-    echo ">>> rendering files";
-
     $this->base_path = $base_path;
   }
 

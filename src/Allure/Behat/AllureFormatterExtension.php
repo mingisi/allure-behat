@@ -57,9 +57,9 @@ class AllureFormatterExtension implements ExtensionInterface
     public function configure(ArrayNodeDefinition $builder)
     {
 
-        $builder->children()->scalarNode("name")->defaultValue("allurehtml");
+        $builder->children()->scalarNode("name")->defaultValue("allure");
         $builder->children()->scalarNode("output")->defaultValue("Twig");
-        $builder->children()->scalarNode("delete_previous_results")->defaultValue("false");
+        $builder->children()->booleanNode("delete_previous_results")->defaultValue(false);
         $builder->children()->scalarNode("ignored_tags")->defaultValue("javascript");
         $builder->children()->scalarNode("severity_tag_prefix")->defaultValue("severity_");
         $builder->children()->scalarNode("issue_tag_prefix")->defaultValue("bug_");
