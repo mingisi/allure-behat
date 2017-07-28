@@ -19,14 +19,39 @@
 
 namespace Allure\Behat\Formatter;
 
-use Behat\Behat\Event\OutlineExampleEvent;
-use Behat\Behat\Event\ScenarioEvent;
-use Behat\Behat\Event\StepEvent;
-use Behat\Behat\Event\SuiteEvent;
-use Behat\Behat\Formatter\FormatterInterface;
-use Behat\Gherkin\Node\FeatureNode;
-use Behat\Gherkin\Node\OutlineNode;
-use Behat\Gherkin\Node\ScenarioNode;
+// use Behat\Behat\Event\OutlineExampleEvent;
+// use Behat\Behat\Event\ScenarioEvent;
+// use Behat\Behat\Event\StepEvent;
+// use Behat\Behat\Event\SuiteEvent;
+// use Behat\Behat\Formatter\FormatterInterface;
+// use Behat\Gherkin\Node\FeatureNode;
+// use Behat\Gherkin\Node\OutlineNode;
+// use Behat\Gherkin\Node\ScenarioNode;
+
+
+// use Behat\Behat\EventDispatcher\Event\OutlineExampleEvent;
+// use Behat\Behat\EventDispatcher\Event\ScenarioEvent;
+// use Behat\Behat\EventDispatcher\Event\StepEvent;
+// use Behat\Behat\EventDispatcher\Event\SuiteEvent;
+use Behat\Testwork\Output\Formatter;
+use Behat\Testwork\EventDispatcher\Event\AfterExerciseCompleted;
+use Behat\Testwork\EventDispatcher\Event\AfterSuiteTested;
+use Behat\Testwork\EventDispatcher\Event\BeforeExerciseCompleted;
+use Behat\Testwork\EventDispatcher\Event\BeforeSuiteTested;
+use Behat\Behat\EventDispatcher\Event\AfterFeatureTested;
+use Behat\Behat\EventDispatcher\Event\AfterOutlineTested;
+use Behat\Behat\EventDispatcher\Event\AfterScenarioTested;
+use Behat\Behat\EventDispatcher\Event\AfterStepTested;
+use Behat\Behat\EventDispatcher\Event\BeforeFeatureTested;
+use Behat\Behat\EventDispatcher\Event\BeforeOutlineTested;
+use Behat\Behat\EventDispatcher\Event\BeforeScenarioTested;
+use Behat\Testwork\Tester\Result;
+use Behat\Testwork\Output\Printer\OutputPrinter as PrinterInterface;
+
+// use Behat\Gherkin\Node\FeatureNode;
+// use Behat\Gherkin\Node\OutlineNode;
+// use Behat\Gherkin\Node\ScenarioNode;
+
 use DateTime;
 use Exception;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
@@ -58,10 +83,14 @@ use Yandex\Allure\Adapter\Event\TestSuiteStartedEvent;
 use Yandex\Allure\Adapter\Model\DescriptionType;
 use Yandex\Allure\Adapter\Model\Provider;
 
+
+use Allure\Behat\Printer\FileOutputPrinter;
+
 /**
- * @author Eduard Sukharev <eduard.sukharev@opensoftdev.ru>
+ * Class BehatFormatter
+ * @package tests\features\formatter
  */
-class AllureFormatter implements FormatterInterface
+class AllureFormatter implements Formatter
 {
     private $translator;
 
@@ -69,27 +98,46 @@ class AllureFormatter implements FormatterInterface
 
     private $uuid;
 
+     /**
+     * @var String
+     */
+    private $name;
+
+    /**
+     * Printer used by this Formatter and Context
+     * @var OutputPrinter
+     */
+    private $printer;
+
     /**
      * @var Exception|Throwable
      */
     private $exception;
 
-    public function __construct()
+    public function __construct($name, $output, $delete_previous_results, $ignored_tags, $severity_tag_prefix, $issue_tag_prefix, $test_id_tag_prefix, $base_path)
     {
-        $defaultLanguage = null;
-        if (($locale = getenv('LANG')) && preg_match('/^([a-z]{2})/', $locale, $matches)) {
-            $defaultLanguage = $matches[1];
-        }
 
-        $this->parameters = new ParameterBag(array(
-            'language' => $defaultLanguage,
-            'output' => 'build' . DIRECTORY_SEPARATOR . 'allure-results',
-            'ignored_tags' => array(),
-            'severity_tag_prefix' => 'severity_',
-            'issue_tag_prefix' => 'bug_',
-            'test_id_tag_prefix' => 'test_',
-            'delete_previous_results' => true,
-        ));
+        // $filename = 'abc';
+        // $base_path = './';
+
+        // $defaultLanguage = null;
+        // if (($locale = getenv('LANG')) && preg_match('/^([a-z]{2})/', $locale, $matches)) {
+        //     $defaultLanguage = $matches[1];
+        // }
+
+        // $this->parameters = new ParameterBag(array(
+        //     'language' => $defaultLanguage,
+        //     'output' => 'build' . DIRECTORY_SEPARATOR . 'allure-results',
+        //     'ignored_tags' => array(),
+        //     'severity_tag_prefix' => 'severity_',
+        //     'issue_tag_prefix' => 'bug_',
+        //     'test_id_tag_prefix' => 'test_',
+        //     'delete_previous_results' => true,
+        // ));
+
+        // $this->printer = new FileOutputPrinter([], $filename, $base_path);
+
+        echo "\n\n$name, $output, $delete_previous_results, $ignored_tags, $severity_tag_prefix, $issue_tag_prefix, $test_id_tag_prefix, $base_path\n\n";
     }
 
     /**
@@ -101,6 +149,9 @@ class AllureFormatter implements FormatterInterface
     {
         $this->translator = $translator;
     }
+
+
+
 
     /**
      * Checks if current formatter has parameter.
@@ -114,11 +165,41 @@ class AllureFormatter implements FormatterInterface
         return $this->parameters->has($name);
     }
 
+
+    /**
+     * Returns formatter name.
+     *
+     * {@inheritDoc}
+     */
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    /**
+     * Returns formatter description.
+     *
+     * {@inheritDoc}
+     */
+    public function getDescription()
+    {
+        return "Allura Reports";
+    }
+
+    /**
+     * Returns formatter output printer.
+     *
+     * {@inheritDoc}
+     */
+    public function getOutputPrinter()
+    {
+        return $this->printer;
+    }
+
     /**
      * Sets formatter parameter.
      *
-     * @param string $name
-     * @param mixed $value
+     * {@inheritDoc}
      */
     public function setParameter($name, $value)
     {
@@ -128,9 +209,7 @@ class AllureFormatter implements FormatterInterface
     /**
      * Returns parameter name.
      *
-     * @param string $name
-     *
-     * @return mixed
+     * {@inheritDoc}
      */
     public function getParameter($name)
     {
@@ -142,24 +221,38 @@ class AllureFormatter implements FormatterInterface
      */
     public static function getSubscribedEvents()
     {
-        $events = array(
-            'beforeSuite',
-            'afterSuite',
-            'beforeScenario',
-            'afterScenario',
-            'beforeOutlineExample',
-            'afterOutlineExample',
-            'beforeStep',
-            'afterStep',
-        );
+        // $events = array(
+        //     'beforeSuite', tester.suite_tested.before -> onBeforeSuiteTested
+        //     'afterSuite', tester.suite_tested.after -> onAfterSuiteTested
+        //     'beforeScenario', tester.scenario_tested.before -> onBeforeScenarioTested
+        //     'afterScenario', tester.scenario_tested.after ->onAfterScenarioTested
+        //     'beforeOutlineExample', tester.outline_tested.before -> onBeforeOutlineTested
+        //     'afterOutlineExample', tester.outline_tested.after -> onAfterOutlineTested
+        //     'beforeStep', tester.step_tested.before -> onBeforeStepTested
+        //     'afterStep', tester.step_tested.after -> onAfterStepTested
+        // );
 
-        return array_combine($events, $events);
+        // return array_combine($events, $events);
+         return array(
+            'tester.exercise_completed.before' => 'onBeforeExercise',
+            'tester.exercise_completed.after'  => 'onAfterExercise',
+            'tester.suite_tested.before'       => 'onBeforeSuiteTested',
+            'tester.suite_tested.after'        => 'onAfterSuiteTested',
+            'tester.feature_tested.before'     => 'onBeforeFeatureTested',
+            'tester.feature_tested.after'      => 'onAfterFeatureTested',
+            'tester.scenario_tested.before'    => 'onBeforeScenarioTested',
+            'tester.scenario_tested.after'     => 'onAfterScenarioTested',
+            'tester.outline_tested.before'     => 'onBeforeOutlineTested',
+            'tester.outline_tested.after'      => 'onAfterOutlineTested',
+            'tester.step_tested.before'        => 'onBeforeStepTested',
+            'tester.step_tested.after'         => 'onAfterStepTested',
+        );
     }
 
     /**
-     * @param SuiteEvent $suiteEvent
+     * @param BeforeSuiteTested $suiteEvent
      */
-    public function beforeSuite(SuiteEvent $suiteEvent)
+    public function onBeforeSuiteTested(BeforeSuiteTested $suiteEvent)
     {
         AnnotationProvider::addIgnoredAnnotations(array());
 
@@ -175,15 +268,18 @@ class AllureFormatter implements FormatterInterface
         Allure::lifecycle()->fire($event);
     }
 
-    public function afterSuite(SuiteEvent $suiteEvent)
+    /**
+     * @param AfterSuiteTested $suiteEvent
+     */
+    public function onAfterSuiteTested(AfterSuiteTested $suiteEvent)
     {
         Allure::lifecycle()->fire(new TestSuiteFinishedEvent($this->uuid));
     }
 
     /**
-     * @param ScenarioEvent $scenarioEvent
+     * @param BeforeScenarioTested $scenarioEvent
      */
-    public function beforeScenario(ScenarioEvent $scenarioEvent)
+    public function onBeforeScenarioTested(BeforeScenarioTested $scenarioEvent)
     {
         $scenario = $scenarioEvent->getScenario();
         $annotations = array_merge(
@@ -199,7 +295,10 @@ class AllureFormatter implements FormatterInterface
         Allure::lifecycle()->fire($event->withTitle($scenario->getTitle()));
     }
 
-    public function beforeOutlineExample(OutlineExampleEvent $outlineExampleEvent)
+    /**
+     * @param BeforeOutlineTested $outlineExampleEvent
+     */
+    public function onBeforeOutlineTested(BeforeOutlineTested $outlineExampleEvent)
     {
         $scenarioOutline = $outlineExampleEvent->getOutline();
 
@@ -223,25 +322,25 @@ class AllureFormatter implements FormatterInterface
     }
 
     /**
-     * @param ScenarioEvent $scenarioEvent
+     * @param AfterScenarioTested $scenarioEvent
      */
-    public function afterScenario(ScenarioEvent $scenarioEvent)
+    public function onAfterScenarioTested(AfterScenarioTested $scenarioEvent)
     {
         $this->processScenarioResult($scenarioEvent->getResult());
     }
 
     /**
-     * @param OutlineExampleEvent $outlineExampleEvent
+     * @param AfterOutlineTested $outlineExampleEvent
      */
-    public function afterOutlineExample(OutlineExampleEvent $outlineExampleEvent)
+    public function onAfterOutlineTested(AfterOutlineTested $outlineExampleEvent)
     {
         $this->processScenarioResult($outlineExampleEvent->getResult());
     }
 
     /**
-     * @param StepEvent $stepEvent
+     * @param BeforeStepTested $stepEvent
      */
-    public function beforeStep(StepEvent $stepEvent)
+    public function onBeforeStepTested(BeforeStepTested $stepEvent)
     {
         $step = $stepEvent->getStep();
         $event = new StepStartedEvent($step->getText());
@@ -250,7 +349,10 @@ class AllureFormatter implements FormatterInterface
         Allure::lifecycle()->fire($event);
     }
 
-    public function afterStep(StepEvent $stepEvent)
+    /**
+     * @param AfterStepTested $stepEvent
+     */
+    public function onAfterStepTested(AfterStepTested $stepEvent)
     {
         switch ($stepEvent->getResult()) {
             case StepEvent::FAILED:
