@@ -56,7 +56,6 @@ class AllureFormatterExtension implements ExtensionInterface
     */
     public function configure(ArrayNodeDefinition $builder)
     {
-
         $builder->children()->scalarNode("name")->defaultValue("allure");
         $builder->children()->scalarNode("output")->defaultValue("Twig");
         $builder->children()->booleanNode("delete_previous_results")->defaultValue(false);
@@ -64,7 +63,6 @@ class AllureFormatterExtension implements ExtensionInterface
         $builder->children()->scalarNode("severity_tag_prefix")->defaultValue("severity_");
         $builder->children()->scalarNode("issue_tag_prefix")->defaultValue("bug_");
         $builder->children()->scalarNode("test_id_tag_prefix")->defaultValue("test_case_");
-        //  $builder->useAttributeAsKey('name')->prototype('variable');
     }
 
    /**
@@ -86,7 +84,5 @@ class AllureFormatterExtension implements ExtensionInterface
         $definition->addArgument('%paths.base%');
         $container->setDefinition("html.formatter", $definition)
         ->addTag("output.formatter");
-
-        echo ">> i'm done setting up";
     }
 }
