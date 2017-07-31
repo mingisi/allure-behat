@@ -74,9 +74,11 @@ class AllureFormatter implements Formatter
      */
     private $translator;
 
+    /**
+     *
+     * @var string
+     */
     private $uuid;
-
-    private $filename = '/build/allure-report';
 
     /**
      * behat.yml parameters
@@ -256,7 +258,6 @@ class AllureFormatter implements Formatter
      */
     public function onAfterSuiteTested(AfterSuiteTested $suiteEvent)
     {
-        echo "\n\n>>>>>>>> onAfterSuiteTested " . $suiteEvent->getSuite()->getName() ." - ". $this->uuid ." \n\n";
         Allure::lifecycle()->fire(new TestSuiteFinishedEvent($this->uuid));
     }
 

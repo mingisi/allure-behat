@@ -23,11 +23,7 @@ class FileOutputPrinter implements PrinterInterface
     }
 
   /**
-   * Verify that the specified output path exists or can be created,
-   * then sets the output path.
-   *
-   * @param String $path Output path relative to %paths.base%
-   *
+   * {@inheritDoc}
    */
     public function setOutputPath($path)
     {
