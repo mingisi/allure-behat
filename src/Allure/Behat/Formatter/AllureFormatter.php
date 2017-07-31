@@ -53,8 +53,10 @@ use Yandex\Allure\Adapter\Event\TestCasePendingEvent;
 use Yandex\Allure\Adapter\Event\TestCaseStartedEvent;
 use Yandex\Allure\Adapter\Event\TestSuiteFinishedEvent;
 use Yandex\Allure\Adapter\Event\TestSuiteStartedEvent;
+
 use Yandex\Allure\Adapter\Model\DescriptionType;
 use Yandex\Allure\Adapter\Model\Provider;
+use Yandex\Allure\Adapter\Model\TestSuite;
 
 
 use Allure\Behat\Printer\FileOutputPrinter;
@@ -65,10 +67,16 @@ use Allure\Behat\Printer\FileOutputPrinter;
  */
 class AllureFormatter implements Formatter
 {
+
+    /**
+     *
+     * @var Translator
+     */
     private $translator;
 
     private $uuid;
-    private $filename = 'allure-results';
+
+    private $filename = '/build/allure-report';
 
     /**
      * behat.yml parameters
@@ -102,7 +110,7 @@ class AllureFormatter implements Formatter
      * Printer used by this Formatter and Context
      * @var OutputPrinter
      */
-    private $printer;
+    private $printer = new FileOutputPrinter();
 
     /**
      * @var Exception|Throwable
@@ -112,10 +120,9 @@ class AllureFormatter implements Formatter
     public function __construct($name, $output, $delete_previous_results, $ignored_tags, $severity_tag_prefix, $issue_tag_prefix, $test_id_tag_prefix, $base_path)
     {
 
+        AnnotationProvider::registerAnnotationNamespaces();
+
         $defaultLanguage = null;
-
-        AnnotationProvider::addIgnoredAnnotations(array());
-
         if (($locale = getenv('LANG')) && preg_match('/^([a-z]{2})/', $locale, $matches)) {
             $defaultLanguage = $matches[1];
         }
@@ -130,8 +137,6 @@ class AllureFormatter implements Formatter
             'test_id_tag_prefix' => $test_id_tag_prefix,
             'delete_previous_results' => $delete_previous_results,
         ));
-
-        $this->printer = new FileOutputPrinter([], $this->filename, $base_path);
     }
 
     /**
@@ -212,108 +217,147 @@ class AllureFormatter implements Formatter
     public static function getSubscribedEvents()
     {
          return array(
-            'tester.exercise_completed.before' => 'onBeforeExercise',
-            'tester.exercise_completed.after'  => 'onAfterExercise',
-            // 'tester.suite_tested.before'       => 'onBeforeSuiteTested',
-            // 'tester.suite_tested.after'        => 'onAfterSuiteTested',
-            // 'tester.feature_tested.before'     => 'onBeforeFeatureTested',
-            // 'tester.feature_tested.after'      => 'onAfterFeatureTested',
+            'tester.suite_tested.before'       => 'onBeforeSuiteTested',
+            'tester.suite_tested.after'        => 'onAfterSuiteTested',
             'tester.scenario_tested.before'    => 'onBeforeScenarioTested',
             'tester.scenario_tested.after'     => 'onAfterScenarioTested',
-            // 'tester.outline_tested.before'     => 'onBeforeOutlineTested',
-            // 'tester.outline_tested.after'      => 'onAfterOutlineTested',
-            'tester.step_tested.before'         => 'onBeforeStepTested',
+            'tester.outline_tested.before'     => 'onBeforeOutlineTested',
+            'tester.outline_tested.after'      => 'onAfterOutlineTested',
+            'tester.step_tested.before'        => 'onBeforeStepTested',
             'tester.step_tested.after'         => 'onAfterStepTested',
         );
     }
 
-    public function onBeforeExercise(BeforeExerciseCompleted $event)
-    {
-        echo "\n\n>>>>>>>> onBeforeExercise --> TestSuiteStartedEvent\n\n";
-
-        $this->prepareOutputDirectory(
-            $this->getParameter('output'),
-            $this->getParameter('delete_previous_results')
-        );
-
-        $now = new DateTime();
-        $event = new TestSuiteStartedEvent(sprintf('TestSuite-%s', $now->format('Y-m-d_His')));
-
-        $this->uuid = $event->getUuid();
-
-        Allure::lifecycle()->fire($event);
-    }
-    public function onAfterExercise(AfterExerciseCompleted $event)
-    {
-        echo "\n\n>>>>>>>> onAfterExercise --> TestSuiteFinishedEvent\n\n";
-        Allure::lifecycle()->fire(new TestSuiteFinishedEvent($this->uuid));
-    }
+    /**
+     * A test suite started.
+     *
+     * @param BeforeSuiteTested $suiteEvent
+     */
     public function onBeforeSuiteTested(BeforeSuiteTested $suiteEvent)
     {
-        echo "\n\n>>>>>>>> onBeforeSuiteTested\n\n";
+
+        AnnotationProvider::addIgnoredAnnotations([]);
+
+        $suiteName = $suiteEvent->getSuite()->getName();
+        $this->prepareOutputDirectory(
+            $this->parameters->get('output'),
+            $this->parameters->get('delete_previous_results')
+        );
+        $now = new DateTime();
+        $event = new TestSuiteStartedEvent(sprintf('TestSuite-%s-%s', $suiteName, $now->format('Y-m-d_His')));
+        $this->uuid = $event->getUuid();
+        Allure::lifecycle()->fire($event);
     }
 
+    /**
+     *  A test suite ended.
+     *
+     * @param AfterSuiteTested $suiteEvent
+     */
     public function onAfterSuiteTested(AfterSuiteTested $suiteEvent)
     {
-        echo "\n\n>>>>>>>> onAfterSuiteTested\n\n";
+        echo "\n\n>>>>>>>> onAfterSuiteTested " . $suiteEvent->getSuite()->getName() ." - ". $this->uuid ." \n\n";
+        Allure::lifecycle()->fire(new TestSuiteFinishedEvent($this->uuid));
     }
-    public function onBeforeFeatureTested(BeforeFeatureTested $event)
-    {
-        echo "\n\n>>>>>>>> onBeforeFeatureTested\n\n";
-    }
-    public function onAfterFeatureTested(AfterFeatureTested $event)
-    {
-        echo "\n\n>>>>>>>> onAfterFeatureTested\n\n";
-    }
+
+
+    /**
+     * A test scenario started.
+     *
+     * @param BeforeScenarioTested $scenarioEvent
+     */
     public function onBeforeScenarioTested(BeforeScenarioTested $scenarioEvent)
     {
-        echo "\n\n>>>>>>>> onBeforeScenarioTested --> TestCaseStartedEvent\n\n";
+        $feature = $scenarioEvent->getFeature();
         $scenario = $scenarioEvent->getScenario();
         $annotations = array_merge(
-            $this->parseFeatureAnnotations($scenarioEvent->getFeature()),
+            $this->parseFeatureAnnotations($feature),
             $this->parseScenarioAnnotations($scenario)
         );
-        echo ">>> anotation 2:";
-        var_dump($annotations);
         $annotationManager = new AnnotationManager($annotations);
-        $scenarioName = sprintf('%s:%d', $scenarioEvent->getFeature()->getFile(), $scenario->getLine());
+        $scenarioName = sprintf('%s:%d', $feature->getFile(), $scenario->getLine());
         $event = new TestCaseStartedEvent($this->uuid, $scenarioName);
         $annotationManager->updateTestCaseEvent($event);
 
         Allure::lifecycle()->fire($event->withTitle($scenario->getTitle()));
     }
+
+    /**
+     * A test scenario ended.
+     *
+     * @param AfterScenarioTested $scenarioEvent
+     */
     public function onAfterScenarioTested(AfterScenarioTested $scenarioEvent)
     {
-        echo "\n\n>>>>>>>> onAfterScenarioTested\n\n";
         $this->processScenarioResult($scenarioEvent->getTestResult());
     }
-    public function onBeforeOutlineTested(BeforeOutlineTested $event)
+
+    /**
+     * A test scenario outline started.
+     *
+     * @param BeforeOutlineTested $outlineExampleEvent
+     */
+    public function onBeforeOutlineTested(BeforeOutlineTested $outlineExampleEvent)
     {
-        echo "\n\n>>>>>>>> onBeforeOutlineTested\n\n";
+        $scenarioOutline = $outlineExampleEvent->getOutline();
+        $scenarioName = sprintf(
+            '%s:%d [%d]',
+            $scenarioOutline->getFile(),
+            $scenarioOutline->getLine(),
+            $outlineExampleEvent->getIteration()
+        );
+        $event = new TestCaseStartedEvent($this->uuid, $scenarioName);
+        $annotations = array_merge(
+            $this->parseFeatureAnnotations($scenarioOutline->getFeature()),
+            $this->parseScenarioAnnotations($scenarioOutline),
+            $this->parseExampleAnnotations($scenarioOutline, $outlineExampleEvent->getIteration())
+        );
+        $annotationManager = new AnnotationManager($annotations);
+        $annotationManager->updateTestCaseEvent($event);
+        Allure::lifecycle()->fire($event->withTitle($scenarioOutline->getTitle()));
     }
-    public function onAfterOutlineTested(AfterOutlineTested $event)
+
+    /**
+     * A test scenario outline ended.
+     *
+     * @param AfterOutlineTested $outlineExampleEvent
+     */
+    public function onAfterOutlineTested(AfterOutlineTested $outlineExampleEvent)
     {
-        echo "\n\n>>>>>>>> onAfterOutlineTested\n\n";
+        $this->processScenarioResult($outlineExampleEvent->getTestResultt());
     }
+
+    /**
+     * A test step started.
+     *
+     * @param BeforeStepTested $stepEvent
+     * @return void
+     */
     public function onBeforeStepTested(BeforeStepTested $stepEvent)
     {
-        echo "\n\n>>>>>>>> onBeforeStepTested  --> StepStartedEvent\n\n";
         $step = $stepEvent->getStep();
         $event = new StepStartedEvent($step->getText());
         $event->withTitle(sprintf('%s %s', $step->getType(), $step->getText()));
 
         Allure::lifecycle()->fire($event);
     }
+
+    /**
+     * A test step ended.
+     *
+     * @param AfterStepTested $stepEvent
+     */
     public function onAfterStepTested(AfterStepTested $stepEvent)
     {
-        echo "\n\n>>>>>>>> onAfterStepTested\n\n";
-        switch ($stepEvent->getTestResult()->getResultCode()) {
+        $result = $stepEvent->getTestResult();
+
+        switch ($result->getResultCode()) {
             case StepResult::FAILED:
-                $this->exception = $stepEvent->getException();
+                $this->exception = $result->getException();
                 $this->addFailedStep();
                 break;
             case StepResult::UNDEFINED:
-                $this->exception = $stepEvent->getException();
+                $this->exception = $result->getException();
                 $this->addFailedStep();
                 break;
             case StepResult::PENDING:
@@ -351,8 +395,6 @@ class AllureFormatter implements Formatter
         if (is_null(Provider::getOutputDirectory())) {
             Provider::setOutputDirectory($outputDirectory);
         }
-
-        echo "output dir: ". Provider::getOutputDirectory() . "\n\n";
     }
 
     /**
@@ -395,7 +437,6 @@ class AllureFormatter implements Formatter
         $description->type = DescriptionType::TEXT;
         $description->value = $featureNode->getDescription();
 
-        // var_dump($feature, $description);
         return [
             $feature,
             $description,
@@ -428,7 +469,7 @@ class AllureFormatter implements Formatter
         } elseif (is_array($ignoredTagsParameter)) {
             $ignoredTags = $ignoredTagsParameter;
         }
-
+        var_dump($scenario->getSteps());
         foreach ($scenario->getTags() as $tag) {
             if (in_array($tag, $ignoredTags)) {
                 continue;
@@ -479,8 +520,7 @@ class AllureFormatter implements Formatter
         if ($testId->getTestCaseIds()) {
             array_push($annotations, $testId);
         }
-        echo ">>>> anotations 1: \n\n";
-        var_dump($annotations);
+
         return $annotations;
     }
 
@@ -506,7 +546,6 @@ class AllureFormatter implements Formatter
 
     private function addCanceledStep()
     {
-        echo "\n\n>>>>>>>> --> StepCanceledEvent\n\n";
         $event = new StepCanceledEvent();
 
         Allure::lifecycle()->fire($event);
@@ -514,7 +553,6 @@ class AllureFormatter implements Formatter
 
     private function addFinishedStep()
     {
-        echo "\n\n>>>>>>>> --> StepFinishedEvent\n\n";
         $event = new StepFinishedEvent();
 
         Allure::lifecycle()->fire($event);
@@ -522,7 +560,6 @@ class AllureFormatter implements Formatter
 
     private function addFailedStep()
     {
-         echo "\n\n>>>>>>>> --> StepFailedEvent\n\n";
         $event = new StepFailedEvent();
 
         Allure::lifecycle()->fire($event);
@@ -530,17 +567,13 @@ class AllureFormatter implements Formatter
 
     private function addTestCaseFinished()
     {
-        echo "\n\n>>>>>>>> --> TestCaseFinishedEvent\n\n";
-
-        $this->exception;
-
         $event = new TestCaseFinishedEvent();
+
         Allure::lifecycle()->fire($event);
     }
 
     private function addTestCaseCancelled()
     {
-        echo "\n\n>>>>>>>> --> TestCaseCanceledEvent\n\n";
         $event = new TestCaseCanceledEvent();
 
         Allure::lifecycle()->fire($event);
@@ -548,7 +581,6 @@ class AllureFormatter implements Formatter
 
     private function addTestCasePending()
     {
-         echo "\n\n>>>>>>>> --> TestCasePendingEvent\n\n";
         $event = new TestCasePendingEvent();
 
         Allure::lifecycle()->fire($event);
@@ -556,7 +588,6 @@ class AllureFormatter implements Formatter
 
     private function addTestCaseBroken()
     {
-        echo "\n\n>>>>>>>> --> TestCaseBrokenEvent\n\n";
         $event = new TestCaseBrokenEvent();
         $event->withException($this->exception)->withMessage($this->exception->getMessage());
 
@@ -565,8 +596,6 @@ class AllureFormatter implements Formatter
 
     private function addTestCaseFailed()
     {
-        echo "\n\n>>>>>>>> --> addTestCaseFailed\n\n";
-
         $event = new TestCaseFailedEvent();
         $event->withException($this->exception)->withMessage($this->exception->getMessage());
 
