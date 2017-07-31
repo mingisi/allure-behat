@@ -12,7 +12,7 @@ To install using [Composer](https://getcomposer.org/) simply add `"allure-framew
     ...
     "require": {
     ...
-        "allure-framework/allure-behat": "~1.0.0",
+        "allure-framework/allure-behat": "dev-master",
     ...
     },
     ...
@@ -28,15 +28,17 @@ To use Allure formatter, add `allure` to your list of formatters in `name`:
 
 ```yml
 
-    formatter:
-        name: pretty,allure
-        parameters:
-            output: build/allure-report
-            delete_previous_results: false
-            ignored_tags: javascript
-            severity_tag_prefix: 'severity_'
-            issue_tag_prefix: 'bug_'
-            test_id_tag_prefix: 'test_case_'
+    formatters:
+       allure: ~
+           
+    extensions:
+       Allure\Behat\AllureFormatterExtension:
+          output: %paths.base%/build/allure-report
+          delete_previous_results: true
+          ignored_tags: javascript
+          severity_tag_prefix: 'severity_'
+          issue_tag_prefix: 'bug_'
+          test_id_tag_prefix: 'test_case_'
 
 ```
 Here:
