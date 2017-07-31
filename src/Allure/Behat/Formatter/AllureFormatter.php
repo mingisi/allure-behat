@@ -2,34 +2,6 @@
 
 namespace Allure\Behat\Formatter;
 
-use Behat\Testwork\Output\Formatter;
-use Behat\Testwork\Tester\Result;
-use Behat\Testwork\EventDispatcher\Event\AfterExerciseCompleted;
-use Behat\Testwork\EventDispatcher\Event\AfterSuiteTested;
-use Behat\Testwork\EventDispatcher\Event\BeforeExerciseCompleted;
-use Behat\Testwork\EventDispatcher\Event\BeforeSuiteTested;
-use Behat\Testwork\Output\Printer\OutputPrinter as PrinterInterface;
-
-use Behat\Behat\EventDispatcher\Event\AfterFeatureTested;
-use Behat\Behat\EventDispatcher\Event\AfterOutlineTested;
-use Behat\Behat\EventDispatcher\Event\AfterScenarioTested;
-use Behat\Behat\EventDispatcher\Event\AfterStepTested;
-use Behat\Behat\EventDispatcher\Event\BeforeStepTested;
-use Behat\Behat\EventDispatcher\Event\BeforeFeatureTested;
-use Behat\Behat\EventDispatcher\Event\BeforeOutlineTested;
-use Behat\Behat\EventDispatcher\Event\BeforeScenarioTested;
-use Behat\Behat\Tester\Result\StepResult;
-
-use Behat\Gherkin\Node\FeatureNode;
-use Behat\Gherkin\Node\OutlineNode;
-use Behat\Gherkin\Node\ScenarioNode;
-
-use DateTime;
-use Exception;
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
-use Symfony\Component\Translation\Translator;
-use Throwable;
-
 use Yandex\Allure\Adapter\Allure;
 use Yandex\Allure\Adapter\AllureException;
 use Yandex\Allure\Adapter\Annotation\AnnotationManager;
@@ -53,11 +25,29 @@ use Yandex\Allure\Adapter\Event\TestCasePendingEvent;
 use Yandex\Allure\Adapter\Event\TestCaseStartedEvent;
 use Yandex\Allure\Adapter\Event\TestSuiteFinishedEvent;
 use Yandex\Allure\Adapter\Event\TestSuiteStartedEvent;
-
 use Yandex\Allure\Adapter\Model\DescriptionType;
 use Yandex\Allure\Adapter\Model\Provider;
 use Yandex\Allure\Adapter\Model\TestSuite;
-
+use Behat\Testwork\Output\Formatter;
+use Behat\Testwork\Tester\Result;
+use Behat\Testwork\Output\Printer\OutputPrinter as PrinterInterface;
+use Behat\Testwork\EventDispatcher\Event\AfterSuiteTested;
+use Behat\Testwork\EventDispatcher\Event\BeforeSuiteTested;
+use Behat\Behat\EventDispatcher\Event\AfterOutlineTested;
+use Behat\Behat\EventDispatcher\Event\AfterScenarioTested;
+use Behat\Behat\EventDispatcher\Event\AfterStepTested;
+use Behat\Behat\EventDispatcher\Event\BeforeStepTested;
+use Behat\Behat\EventDispatcher\Event\BeforeOutlineTested;
+use Behat\Behat\EventDispatcher\Event\BeforeScenarioTested;
+use Behat\Behat\Tester\Result\StepResult;
+use Behat\Gherkin\Node\FeatureNode;
+use Behat\Gherkin\Node\OutlineNode;
+use Behat\Gherkin\Node\ScenarioNode;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+use Symfony\Component\Translation\Translator;
+use DateTime;
+use Exception;
+use Throwable;
 
 use Allure\Behat\Printer\FileOutputPrinter;
 
@@ -112,7 +102,7 @@ class AllureFormatter implements Formatter
      * Printer used by this Formatter and Context
      * @var OutputPrinter
      */
-    private $printer = new FileOutputPrinter();
+    private $printer;
 
     /**
      * @var Exception|Throwable
@@ -139,6 +129,8 @@ class AllureFormatter implements Formatter
             'test_id_tag_prefix' => $test_id_tag_prefix,
             'delete_previous_results' => $delete_previous_results,
         ));
+
+        $this->printer = new FileOutputPrinter();
     }
 
     /**
@@ -470,7 +462,7 @@ class AllureFormatter implements Formatter
         } elseif (is_array($ignoredTagsParameter)) {
             $ignoredTags = $ignoredTagsParameter;
         }
-        var_dump($scenario->getSteps());
+
         foreach ($scenario->getTags() as $tag) {
             if (in_array($tag, $ignoredTags)) {
                 continue;
