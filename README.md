@@ -1,7 +1,9 @@
 # Allure Behat Adapter
 
-This is a [Behat](http://behat.org/en/latest/) extension with Formatter that produces report data for [Yandex Allure](http://allure.qatools.ru/) test
+This is a [Behat](http://behat.org/en/latest/) extension with Formatter that produces report data for [Allure](http://allure.qatools.ru/) test
 reporting tool.
+
+forked from allure-framework/allure-behat
 
 ## Installation
 
